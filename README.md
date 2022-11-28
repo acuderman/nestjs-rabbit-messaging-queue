@@ -1,1 +1,1 @@
-# nestjs-rmq
+# nestjs-rabbit-messaging-queue
