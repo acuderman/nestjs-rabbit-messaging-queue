@@ -13,7 +13,7 @@ jobs:
         with:
           node-version: '16.x'
           registry-url: 'https://registry.npmjs.org'
-      - run: npm lint
+      - run: npm run lint
 
   build-and-publish-npm-package:
     runs-on: ubuntu-latest
