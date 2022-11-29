@@ -3,16 +3,15 @@ import { Decorators } from './interfaces';
 
 export function Rpc(
   routingKey: string,
-  queuePrefix: string,
+  queueName: string,
   exchange: string,
   queueOptions: QueueOptions,
 ): Decorators {
-  const fullQueueName = `${queuePrefix}-${exchange}_${routingKey}`;
 
   return RabbitRPC({
     exchange: exchange,
     createQueueIfNotExists: true,
-    queue: fullQueueName,
+    queue: queueName,
     routingKey: routingKey,
     queueOptions: queueOptions
   })

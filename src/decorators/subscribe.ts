@@ -16,7 +16,7 @@ export const RABBIT_RETRY_HANDLER = 'RABBIT_RETRY_HANDLER';
 
 export function Subscribe(
   routingKey: string,
-  queuePrefix: string,
+  queueName: string,
   options: SubscriptionOptions,
 ): Decorators {
   const subscriptionOptions: SubscriptionOptionsWithDefaults = {
@@ -33,9 +33,6 @@ export function Subscribe(
     logEventPayload: options.logEventPayload ?? true
   };
 
-  const queueSpecificRoutingKey = `${queuePrefix}-${routingKey}`;
-  const fullQueueName = `${queuePrefix}-${subscriptionOptions.exchange}_${routingKey}`;
-
   const customArguments = subscriptionOptions.queue.arguments
 
   const queueOptions: QueueOptions = {
@@ -46,16 +43,16 @@ export function Subscribe(
           'x-dead-letter-exchange': RmqExchangeUtil.getDeadLetterExchangeName(
               subscriptionOptions.exchange,
           ),
-          'x-dead-letter-routing-key': queueSpecificRoutingKey,
+          'x-dead-letter-routing-key': queueName,
         }
         : customArguments,
   };
 
   const baseMessageHandlerOptions: MessageHandlerOptions = {
     createQueueIfNotExists: true,
-    queue: fullQueueName,
+    queue: queueName,
     errorHandler: createErrorHandler(
-      queueSpecificRoutingKey,
+      queueName,
       subscriptionOptions,
       subscriptionOptions.exchange,
       subscriptionOptions.logEventPayload,
@@ -75,7 +72,7 @@ export function Subscribe(
     decorators.push(
       SetMetadata(RABBIT_RETRY_HANDLER, {
         type: 'subscribe',
-        routingKey: queueSpecificRoutingKey,
+        routingKey: queueName,
         exchange: RmqExchangeUtil.getRetryExchangeName(
           subscriptionOptions.exchange,
         ),
