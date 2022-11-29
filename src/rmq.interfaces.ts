@@ -1,24 +1,10 @@
-import { RabbitMQExchangeConfig } from '@golevelup/nestjs-rabbitmq';
+import { RabbitMQConfig, RabbitMQExchangeConfig } from '@golevelup/nestjs-rabbitmq';
 
-export interface QueueOptions {
-  exchanges: RabbitMQExchangeConfig[];
-  url: string;
-  prefetchCount?: number;
+export interface RabbitMQModuleConfig extends RabbitMQConfig {
+    exchanges: RabbitMQExchange[]
 }
 
-export enum RPCResponseType {
-  SUCCESS = 0,
-  ERROR = 1,
+export interface RabbitMQExchange extends RabbitMQExchangeConfig {
+    initRetryExchange?: boolean,
+    initDeadLetterExchange?: boolean,
 }
-
-interface RPCSuccessResponse<T> {
-  type: RPCResponseType.SUCCESS;
-  data: T;
-}
-
-interface RPCErrorResponse {
-  type: RPCResponseType.ERROR;
-  message: string;
-}
-
-export type RPCResponse<T> = RPCSuccessResponse<T> | RPCErrorResponse;

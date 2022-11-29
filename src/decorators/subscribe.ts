@@ -10,45 +10,47 @@ import {
 } from '@golevelup/nestjs-rabbitmq/lib/amqp/errorBehaviors';
 import { Channel, ConsumeMessage } from 'amqplib';
 import { RmqExchangeUtil } from '../rmq-exchange.util';
-import { Event } from '../event';
 import { Decorators, SubscriptionOptions, SubscriptionOptionsWithDefaults } from './interfaces';
 
 export const RABBIT_RETRY_HANDLER = 'RABBIT_RETRY_HANDLER';
 
 export function Subscribe(
-  event: Event<unknown>,
-  queueName: string,
+  routingKey: string,
+  queuePrefix: string,
   options: SubscriptionOptions,
 ): Decorators {
   const subscriptionOptions: SubscriptionOptionsWithDefaults = {
-    requeueOnError: {
-      enabled: true,
-      initialDelayInMs: 20_000,
+    onError: {
+      retry: true,
+      deadLetter: true,
+      retryInitialDelayInMs: 20_000,
       maxRetries: 5,
-      backoffMultiplier: 2,
-      ...options.requeueOnError
+      retryBackoffMultiplier: 2,
+      ...options.onError
     },
     exchange: options.exchange,
-    autoDelete: options.autoDelete ?? false,
-    durable: options.durable ?? true
+    queue: options.queue ?? {},
+    logEventPayload: options.logEventPayload ?? true
   };
 
-  const routingKey = event.getRoutingKey();
-  const queueSpecificRoutingKey = `${queueName}-${routingKey}`;
-  const fullQueueName = `${queueName}-${subscriptionOptions.exchange}_${routingKey}`;
+  const queueSpecificRoutingKey = `${queuePrefix}-${routingKey}`;
+  const fullQueueName = `${queuePrefix}-${subscriptionOptions.exchange}_${routingKey}`;
+
+  const customArguments = subscriptionOptions.queue.arguments
 
   const queueOptions: QueueOptions = {
-    durable: subscriptionOptions.durable,
-    autoDelete: subscriptionOptions.autoDelete,
-    arguments: subscriptionOptions.requeueOnError.enabled
-      ? {
+    ...subscriptionOptions.queue,
+    arguments: subscriptionOptions.onError.deadLetter
+        ? {
+          ...customArguments,
           'x-dead-letter-exchange': RmqExchangeUtil.getDeadLetterExchangeName(
-            subscriptionOptions.exchange,
+              subscriptionOptions.exchange,
           ),
           'x-dead-letter-routing-key': queueSpecificRoutingKey,
         }
-      : {},
+        : customArguments,
   };
+
   const baseMessageHandlerOptions: MessageHandlerOptions = {
     createQueueIfNotExists: true,
     queue: fullQueueName,
@@ -56,22 +58,20 @@ export function Subscribe(
       queueSpecificRoutingKey,
       subscriptionOptions,
       subscriptionOptions.exchange,
-      event.getOptions().isSensitive,
+      subscriptionOptions.logEventPayload,
     ),
     queueOptions,
   };
 
-  const decorators: MethodDecorator[] = [];
-
-  decorators.push(
-    RabbitSubscribe({
-      exchange: subscriptionOptions.exchange,
-      routingKey: routingKey,
-      ...baseMessageHandlerOptions,
+  const decorators: MethodDecorator[] = [
+      RabbitSubscribe({
+        exchange: subscriptionOptions.exchange,
+        routingKey: routingKey,
+        ...baseMessageHandlerOptions,
     }),
-  );
+  ];
 
-  if (subscriptionOptions.requeueOnError.enabled) {
+  if (subscriptionOptions.onError.retry) {
     decorators.push(
       SetMetadata(RABBIT_RETRY_HANDLER, {
         type: 'subscribe',
@@ -91,7 +91,7 @@ function createErrorHandler(
   queueSpecificRoutingKey: string,
   options: SubscriptionOptionsWithDefaults,
   exchange: string,
-  isSensitive: boolean,
+  logEventPayload: boolean,
 ): (
   channel: Channel,
   msg: ConsumeMessage,
@@ -103,20 +103,20 @@ function createErrorHandler(
 
     Logger.error({
       message: `Event handling failed for routing key "${queueSpecificRoutingKey}"`,
-      payload: isSensitive ? msg.content.toString() : undefined,
+      payload: logEventPayload ? msg.content.toString() : undefined,
       error,
-      requeue: options.requeueOnError.enabled,
+      requeue: options.onError.retry,
       retryAttempt,
     });
 
-    if (options.requeueOnError.enabled) {
+    if (options.onError.retry) {
       const delay: number =
-        messageHeaders['x-delay'] ?? options.requeueOnError.initialDelayInMs / options.requeueOnError.backoffMultiplier;
+        messageHeaders['x-delay'] ?? options.onError.retryInitialDelayInMs / options.onError.retryBackoffMultiplier;
 
-      if (retryAttempt < options.requeueOnError.maxRetries) {
+      if (retryAttempt < options.onError.maxRetries) {
         const retryHeaders = {
           ...messageHeaders,
-          'x-delay': delay * options.requeueOnError.backoffMultiplier,
+          'x-delay': delay * options.onError.retryBackoffMultiplier,
           'x-retry': retryAttempt + 1,
           'event-id': messageHeaders['event-id'],
         };

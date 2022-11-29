@@ -1,3 +1,5 @@
+import { QueueOptions } from '@golevelup/nestjs-rabbitmq';
+
 // eslint-disable-next-line @typescript-eslint/ban-types
 export type Decorators = <TFunction extends Function, Y>(
   target: object | TFunction,
@@ -6,24 +8,24 @@ export type Decorators = <TFunction extends Function, Y>(
 ) => void;
 
 export interface SubscriptionOptions {
-  requeueOnError?: RequeueOnErrorOptions;
+  onError?: RequeueOnErrorOptions;
   exchange: string;
-  autoDelete?: boolean;
-  durable?: boolean
+  queue?: QueueOptions;
+  logEventPayload?: boolean;
 }
 
 export interface RequeueOnErrorOptions {
-  enabled?: boolean,
-  initialDelayInMs?: number,
+  retry?: boolean,
+  deadLetter?: boolean,
+  retryInitialDelayInMs?: number,
   maxRetries?: number,
-  backoffMultiplier?: number
+  retryBackoffMultiplier?: number
 }
 
 export interface SubscriptionOptionsWithDefaults extends Required<SubscriptionOptions>{
-  requeueOnError: Required<RequeueOnErrorOptions>
+  onError: Required<RequeueOnErrorOptions>
 }
 
-export interface RpcOptions {
-  exchange: string;
-  durable?: boolean
+export {
+  QueueOptions
 }

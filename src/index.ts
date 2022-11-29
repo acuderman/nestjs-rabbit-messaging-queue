@@ -1,5 +1,5 @@
 export * from './decorators'
-export * from './event'
 export * from './rmq.module'
 export * from './rmq.service'
+export * from './rmq-exchange.util'
 export * from './rmq.interfaces'

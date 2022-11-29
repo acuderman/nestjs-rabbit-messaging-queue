@@ -1,24 +1,19 @@
-import { RabbitRPC } from '@golevelup/nestjs-rabbitmq';
-import { Decorators, RpcOptions } from './interfaces';
+import { QueueOptions, RabbitRPC } from '@golevelup/nestjs-rabbitmq';
+import { Decorators } from './interfaces';
 
 export function Rpc(
   routingKey: string,
-  queueName: string,
-  options: RpcOptions,
+  queuePrefix: string,
+  exchange: string,
+  queueOptions: QueueOptions,
 ): Decorators {
-  const rpcOptions: RpcOptions = {
-    exchange: options.exchange,
-    durable: options.durable ?? true
-  };
-  const fullQueueName = `${queueName}-${rpcOptions.exchange}_${routingKey}`;
+  const fullQueueName = `${queuePrefix}-${exchange}_${routingKey}`;
 
   return RabbitRPC({
-    exchange: options.exchange,
+    exchange: exchange,
     createQueueIfNotExists: true,
     queue: fullQueueName,
     routingKey: routingKey,
-    queueOptions: {
-      durable: options.durable,
-    }
+    queueOptions: queueOptions
   })
 }

@@ -11,10 +11,8 @@ import {
 import { ChannelWrapper } from 'amqp-connection-manager';
 import { RmqExchangeUtil } from './rmq-exchange.util';
 import { Options } from 'amqplib';
-import { RPCResponse } from './rmq.interfaces';
 import { DiscoveryService } from '@golevelup/nestjs-discovery';
 import { RABBIT_RETRY_HANDLER } from './decorators';
-import { Event } from './event';
 
 @Injectable()
 export class RmqService implements OnApplicationBootstrap {
@@ -24,12 +22,12 @@ export class RmqService implements OnApplicationBootstrap {
   ) {}
 
   public publishEvent<T extends object>(
-    event: Event<T>,
+    routingKey: string,
     message: T,
     exchange: string,
     options?: Options.Publish,
   ): void {
-    this.amqpConnection.publish(exchange, event.getRoutingKey(), message, options);
+    this.amqpConnection.publish(exchange, routingKey, message, options);
   }
 
   public async request<K = object, T extends object = object>(
@@ -37,8 +35,8 @@ export class RmqService implements OnApplicationBootstrap {
     payload: T = {} as T,
     exchange: string,
     options?: RequestOptions,
-  ): Promise<RPCResponse<K>> {
-    return this.amqpConnection.request<RPCResponse<K>>({
+  ): Promise<K> {
+    return this.amqpConnection.request<K>({
       exchange,
       routingKey,
       payload: payload,
@@ -87,8 +85,11 @@ export class RmqService implements OnApplicationBootstrap {
     channel: ChannelWrapper,
     meta: RabbitHandlerConfig,
   ): Promise<void> {
-    if (meta.queue === undefined || meta.queueOptions === undefined) {
-      Logger.error(
+    const deadLetterExchange = meta.queueOptions?.arguments['x-dead-letter-exchange']
+    const deadLetterRoutingKey = meta.queueOptions?.arguments['x-dead-letter-routing-key']
+
+    if (meta.queue === undefined || meta.queueOptions === undefined || deadLetterRoutingKey === undefined || deadLetterExchange === undefined) {
+      Logger.warn(
         'Invalid queue configuration. queue or queueOptions are missing. Dead letter queues are not initialized',
       );
       return;
@@ -102,15 +103,15 @@ export class RmqService implements OnApplicationBootstrap {
     );
     await channel.bindQueue(
       queue,
-      meta.queueOptions.arguments['x-dead-letter-exchange'],
-      meta.queueOptions.arguments['x-dead-letter-routing-key'],
+      deadLetterExchange,
+      deadLetterRoutingKey,
     );
 
     Logger.log({
       message: 'Dead letter queue initialized',
       queue: meta.queue,
-      exchange: meta.queueOptions.arguments['x-dead-letter-exchange'],
-      routingKey: meta.queueOptions.arguments['x-dead-letter-routing-key'],
+      exchange: deadLetterExchange,
+      routingKey: deadLetterRoutingKey,
     });
   }
 }
