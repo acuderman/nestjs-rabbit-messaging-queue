@@ -7,8 +7,22 @@ import { RabbitMQModuleConfig } from './rmq.interfaces';
 @Module({})
 export class RmqModule {
   static register(options: RabbitMQModuleConfig): DynamicModule {
+    const rmqConfigFactory = (...args) => {
+      const config = options.useFactory(...args)
+
+      return {
+        logger: new Logger(),
+        ...config,
+        exchanges: RmqExchangeUtil.createExchanges(config.exchanges),
+      }
+    }
+
     const imports = [
-      RabbitMQModule.forRootAsync(RabbitMQModule, options),
+      RabbitMQModule.forRootAsync(RabbitMQModule, {
+        imports: options.imports,
+        inject: options.inject,
+        useFactory: rmqConfigFactory,
+      }),
     ];
 
     const exports: Provider[] = [RabbitMQModule, RmqService];
