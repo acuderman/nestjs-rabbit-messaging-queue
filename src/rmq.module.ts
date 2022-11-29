@@ -2,12 +2,12 @@ import { DynamicModule, Logger, Module, Provider } from '@nestjs/common';
 import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
 import { RmqExchangeUtil } from './rmq-exchange.util';
 import { RmqService } from './rmq.service';
-import { RabbitMQModuleConfig } from './rmq.interfaces';
+import { RabbitMQInitConfig, RabbitMQModuleConfig } from './rmq.interfaces';
 
 @Module({})
 export class RmqModule {
   static register(options: RabbitMQModuleConfig): DynamicModule {
-    const rmqConfigFactory = (...args) => {
+    const rmqConfigFactory = (...args): RabbitMQInitConfig => {
       const config = options.useFactory(...args)
 
       return {
